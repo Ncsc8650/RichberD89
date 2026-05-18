@@ -1,27 +1,293 @@
-const state={admin:false,currentItems:[],statuses:[],networks:[],adminItems:[]};
-const qs=(id)=>document.getElementById(id);
-const money=(v)=>new Intl.NumberFormat('th-TH',{maximumFractionDigits:0}).format(Number(v||0));
-async function api(url,options={}){const res=await fetch(url,options);if(!res.ok){let error='เกิดข้อผิดพลาด';try{error=(await res.json()).error||error}catch{}throw new Error(error)}if(res.status===204)return null;return res.json()}
-function showView(name){qs('publicView').classList.toggle('active',name==='public');qs('adminView').classList.toggle('active',name==='admin');qs('publicTab').classList.toggle('active',name==='public');qs('adminTab').classList.toggle('active',name==='admin');if(name==='admin')checkAdmin()}
-function optionHtml(items,all=false){return (all?'<option value="">ทั้งหมด</option>':'')+items.map(i=>`<option value="${i.name}">${i.name}</option>`).join('')}
-async function loadMeta(){const meta=await api('/api/meta');state.admin=meta.admin;state.statuses=meta.statuses||[];state.networks=meta.networks||[];qs('filterStatus').innerHTML=optionHtml(state.statuses,true);qs('filterNetwork').innerHTML=optionHtml(state.networks,true);qs('status').innerHTML=optionHtml(state.statuses);qs('network').innerHTML=optionHtml(state.networks);renderMasterLists();return meta}
-async function loadPublic(random=true){const q=encodeURIComponent(qs('searchInput').value.trim());const data=await api(`/api/numbers?q=${q}&random=${random?1:0}`);state.currentItems=data.items;qs('numberRows').innerHTML=data.items.map(item=>`<tr><td>${item.network||'-'}</td><td><div class="phone">${item.phone}</div><div>${item.status||''}</div></td><td><span class="score">${item.analysis.score}</span><div>${item.analysis.level}</div></td><td class="price">${money(item.sale_price)} บาท</td><td><button data-detail="${item.id}">รายละเอียด</button></td></tr>`).join('')||'<tr><td colspan="5">ไม่พบข้อมูล</td></tr>'}
-async function showDetail(id){const item=await api(`/api/numbers/${id}`);const a=item.analysis;qs('detailTitle').textContent=`รายละเอียดเบอร์ ${item.phone}`;qs('detailBody').innerHTML=`<div class="detail-grid"><div class="detail-card"><strong>คะแนน</strong><div class="phone">${a.score}/100 (${a.level})</div></div><div class="detail-card"><strong>ราคา</strong><div class="price">${money(item.sale_price)} บาท</div></div><div class="detail-card"><strong>เครือข่าย</strong><div>${item.network||'-'}</div></div><div class="detail-card"><strong>สถานะ</strong><div>${item.status||'-'}</div></div></div><div><h3>สรุปสูตรที่พบ</h3><div class="chips">${a.summary.map(s=>`<span class="chip">${s}</span>`).join('')}</div></div>${a.highlights.length?`<div class="detail-card"><h3>จุดเด่น</h3><ul>${a.highlights.map(s=>`<li>${s}</li>`).join('')}</ul></div>`:''}${a.warnings.length?`<div class="detail-card"><h3>ข้อควรระวัง</h3><ul>${a.warnings.map(s=>`<li>${s}</li>`).join('')}</ul></div>`:''}${a.career_matches.length?`<div class="detail-card"><h3>กลุ่มอาชีพที่ส่งเสริม</h3><ul>${a.career_matches.map(m=>`<li>${m.title}: ${m.pairs.join(', ')}</li>`).join('')}</ul></div>`:''}<div><h3>ความหมายเลขคู่ลำดับในเบอร์</h3><div class="pair-list">${a.pair_details.map(p=>`<div class="pair-item"><strong>${p.pair}</strong> ${p.meaning}</div>`).join('')}</div></div>`;qs('detailDialog').showModal()}
-async function checkAdmin(){const meta=await loadMeta();qs('loginPanel').classList.toggle('hidden',meta.admin);qs('adminPanel').classList.toggle('hidden',!meta.admin);if(meta.admin){await loadAdmin();await loadLogs()}}
-function filterQuery(){const p=new URLSearchParams();for(const [key,id] of [['min_price','minPrice'],['max_price','maxPrice'],['status','filterStatus'],['network','filterNetwork']]){const v=qs(id).value.trim();if(v)p.set(key,v)}return p.toString()}
-async function loadAdmin(){const data=await api(`/api/admin/list?${filterQuery()}`);state.adminItems=data.items;qs('adminRows').innerHTML=data.items.map(item=>`<tr><td>${item.sequence_no||''}</td><td class="phone">${item.phone}</td><td><span class="score">${item.analysis.score}</span></td><td>${money(item.sale_price)}</td><td>${money(item.wholesale_price)}</td><td>${item.network||''}</td><td>${item.status||''}</td><td class="row-actions"><button data-edit="${item.id}">แก้ไข</button><button class="danger" data-delete="${item.id}">ลบ</button></td></tr>`).join('')||'<tr><td colspan="8">ไม่พบข้อมูล</td></tr>'}
-function fillForm(item={}){qs('numberId').value=item.id||'';qs('sequenceNo').value=item.sequence_no||'';qs('phone').value=item.phone||'';qs('salePrice').value=item.sale_price||'';qs('wholesalePrice').value=item.wholesale_price||'';qs('network').value=item.network||(state.networks[0]?.name||'');qs('status').value=item.status||(state.statuses[0]?.name||'รอขาย');qs('expiryDate').value=item.expiry_date||''}
-async function saveNumber(e){e.preventDefault();const payload={id:qs('numberId').value,sequence_no:qs('sequenceNo').value,phone:qs('phone').value,sale_price:qs('salePrice').value,wholesale_price:qs('wholesalePrice').value,network:qs('network').value,status:qs('status').value,expiry_date:qs('expiryDate').value};await api('/api/admin/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});qs('adminMessage').textContent='บันทึกข้อมูลเรียบร้อย';fillForm();await refreshAdminData()}
-async function deleteNumber(id){if(!confirm('ต้องการลบ record เบอร์นี้ใช่ไหม?'))return;await api('/api/admin/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});await refreshAdminData()}
-function exportUrl(type){const q=filterQuery();window.location.href=`/api/admin/export.${type}${q?`?${q}`:''}`}
-function showResult(title,html){qs('resultTitle').textContent=title;qs('resultBody').innerHTML=html;qs('resultDialog').showModal()}
-async function uploadExcel(){const file=qs('excelFile').files[0];if(!file){showResult('อัปโหลดไม่สำเร็จ','<p>กรุณาเลือกไฟล์ Excel ก่อน</p>');return}const data=await file.arrayBuffer();try{const result=await api('/api/admin/upload',{method:'POST',headers:{'X-Replace-All':qs('replaceAll').checked?'1':'0','X-Filename':encodeURIComponent(file.name)},body:data});showResult('อัปโหลดสำเร็จ',`<div class="result-grid"><div><strong>ทั้งหมด</strong><span>${result.total_rows}</span></div><div><strong>นำเข้า</strong><span>${result.imported_rows}</span></div><div><strong>ซ้ำ</strong><span>${result.duplicate_rows}</span></div><div><strong>Error</strong><span>${result.error_rows}</span></div></div><p>บันทึก log เลขที่ ${result.log_id}</p>${result.details.length?`<h3>รายการที่ต้องตรวจสอบ</h3><div class="log-detail">${result.details.slice(0,20).map(d=>`<p>แถว ${d.row} ${d.phone||''}: ${d.message}</p>`).join('')}</div>`:''}`);await refreshAdminData()}catch(error){showResult('อัปโหลดไม่สำเร็จ',`<p>${error.message}</p>`);await loadLogs()}}
-async function refreshAdminData(){await loadMeta();await loadAdmin();await loadLogs();await loadPublic()}
-function renderMasterLists(){qs('statusList').innerHTML=state.statuses.map(i=>masterRow('status',i)).join('');qs('networkList').innerHTML=state.networks.map(i=>masterRow('network',i)).join('')}
-function masterRow(kind,item){return `<div class="master-row"><span>${item.name}</span><small>ลำดับ ${item.sort_order||0}</small><button data-master-edit="${kind}" data-id="${item.id}">แก้ไข</button><button class="danger" data-master-delete="${kind}" data-id="${item.id}">ลบ</button></div>`}
-function fillMaster(kind,item={}){const p=kind==='status'?'status':'network';qs(`${p}Id`).value=item.id||'';qs(`${p}Name`).value=item.name||'';qs(`${p}Order`).value=item.sort_order||''}
-async function saveMaster(kind,e){e.preventDefault();const p=kind==='status'?'status':'network';const path=kind==='status'?'statuses':'networks';await api(`/api/admin/${path}/save`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:qs(`${p}Id`).value,name:qs(`${p}Name`).value,sort_order:qs(`${p}Order`).value})});fillMaster(kind);await refreshAdminData()}
-async function deleteMaster(kind,id){if(!confirm('ต้องการลบข้อมูลพื้นฐานนี้ใช่ไหม?'))return;const path=kind==='status'?'statuses':'networks';try{await api(`/api/admin/${path}/delete`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id})});await refreshAdminData()}catch(error){showResult('ลบไม่ได้',`<p>${error.message}</p>`)}}
-async function loadLogs(){const data=await api('/api/admin/import-logs');qs('logRows').innerHTML=data.items.map(log=>`<tr><td>${log.created_at}</td><td>${decodeURIComponent(log.filename||'')}</td><td>${log.total_rows}</td><td>${log.imported_rows}</td><td>${log.duplicate_rows}</td><td>${log.error_rows}</td><td><button data-log="${log.id}">ดูรายละเอียด</button></td></tr>`).join('')||'<tr><td colspan="7">ยังไม่มีประวัติ import</td></tr>'}
-async function showLog(id){const log=await api(`/api/admin/import-logs/${id}`);showResult(`Import log #${id}`,`<div class="result-grid"><div><strong>ทั้งหมด</strong><span>${log.total_rows}</span></div><div><strong>นำเข้า</strong><span>${log.imported_rows}</span></div><div><strong>ซ้ำ</strong><span>${log.duplicate_rows}</span></div><div><strong>Error</strong><span>${log.error_rows}</span></div></div><div class="log-detail">${(log.details||[]).map(d=>`<p>แถว ${d.row} ${d.phone||''}: ${d.status} - ${d.message}</p>`).join('')||'<p>ไม่มี error หรือรายการซ้ำ</p>'}</div>`)}
-qs('publicTab').addEventListener('click',()=>showView('public'));qs('adminTab').addEventListener('click',()=>showView('admin'));qs('searchBtn').addEventListener('click',()=>loadPublic(false));qs('randomBtn').addEventListener('click',()=>{qs('searchInput').value='';loadPublic(true)});qs('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')loadPublic(false)});qs('numberRows').addEventListener('click',e=>{const id=e.target.dataset.detail;if(id)showDetail(id)});qs('closeDetail').addEventListener('click',()=>qs('detailDialog').close());qs('closeResult').addEventListener('click',()=>qs('resultDialog').close());qs('loginBtn').addEventListener('click',async()=>{qs('loginMessage').textContent='';try{await api('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({user:qs('loginUser').value,password:qs('loginPassword').value})});await checkAdmin()}catch(error){qs('loginMessage').textContent=error.message;qs('loginMessage').classList.add('error')}});qs('logoutBtn').addEventListener('click',async()=>{await fetch('/api/logout',{method:'POST'});await checkAdmin()});qs('numberForm').addEventListener('submit',saveNumber);qs('clearForm').addEventListener('click',()=>fillForm());qs('uploadBtn').addEventListener('click',uploadExcel);qs('refreshAdmin').addEventListener('click',loadAdmin);qs('refreshLogs').addEventListener('click',loadLogs);qs('exportXlsx').addEventListener('click',()=>exportUrl('xlsx'));qs('exportPdf').addEventListener('click',()=>exportUrl('pdf'));qs('adminRows').addEventListener('click',e=>{const edit=e.target.dataset.edit,del=e.target.dataset.delete;if(edit){fillForm(state.adminItems.find(r=>String(r.id)===String(edit)));window.scrollTo({top:0,behavior:'smooth'})}if(del)deleteNumber(del)});qs('statusForm').addEventListener('submit',e=>saveMaster('status',e));qs('networkForm').addEventListener('submit',e=>saveMaster('network',e));qs('clearStatus').addEventListener('click',()=>fillMaster('status'));qs('clearNetwork').addEventListener('click',()=>fillMaster('network'));qs('statusList').addEventListener('click',e=>{const id=e.target.dataset.id;if(e.target.dataset.masterEdit)fillMaster('status',state.statuses.find(i=>String(i.id)===String(id)));if(e.target.dataset.masterDelete)deleteMaster('status',id)});qs('networkList').addEventListener('click',e=>{const id=e.target.dataset.id;if(e.target.dataset.masterEdit)fillMaster('network',state.networks.find(i=>String(i.id)===String(id)));if(e.target.dataset.masterDelete)deleteMaster('network',id)});qs('logRows').addEventListener('click',e=>{const id=e.target.dataset.log;if(id)showLog(id)});['minPrice','maxPrice','filterStatus','filterNetwork'].forEach(id=>qs(id).addEventListener('change',loadAdmin));loadMeta().then(()=>loadPublic());
+const state = { admin: false, currentItems: [], statuses: [], networks: [], adminItems: [], adminPage: 1, adminTotal: 0, adminLimit: 50 };
+const qs = (id) => document.getElementById(id);
+const money = (value) => new Intl.NumberFormat("th-TH", { maximumFractionDigits: 0 }).format(Number(value || 0));
+const statusOrder = ["จองแล้ว", "รอขาย", "จำหน่ายแล้ว", "จำหน่ายไปแล้ว"];
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[ch]));
+}
+
+function sortStatuses(items) {
+  return [...items].sort((a, b) => {
+    const ai = statusOrder.indexOf(a.name);
+    const bi = statusOrder.indexOf(b.name);
+    return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi) || (a.sort_order || 0) - (b.sort_order || 0) || a.name.localeCompare(b.name, "th");
+  });
+}
+
+function displayLevel(analysis) {
+  return Number(analysis?.score || 0) < 55 ? "กลาง" : (analysis?.level || "กลาง");
+}
+
+function scoreHtml(analysis) {
+  const score = Number(analysis?.score || 0);
+  const stars = score > 80 ? '<span class="star">★</span>' : "";
+  return `<span class="score ${score > 80 ? "score-star" : ""}">${stars}<span>${score}</span>${stars}</span><div>${displayLevel(analysis)}</div>`;
+}
+
+async function api(url, options = {}) {
+  const res = await fetch(url, options);
+  if (!res.ok) {
+    let error = "เกิดข้อผิดพลาด";
+    try { error = (await res.json()).error || error; } catch {}
+    throw new Error(error);
+  }
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+function showView(name) {
+  qs("publicView").classList.toggle("active", name === "public");
+  qs("adminView").classList.toggle("active", name === "admin");
+  qs("publicTab").classList.toggle("active", name === "public");
+  qs("adminTab").classList.toggle("active", name === "admin");
+  if (name === "admin") checkAdmin();
+}
+
+function optionHtml(items, all = false) {
+  return (all ? '<option value="">ทั้งหมด</option>' : "") + items.map((i) => `<option value="${escapeHtml(i.name)}">${escapeHtml(i.name)}</option>`).join("");
+}
+
+async function loadMeta() {
+  const meta = await api("/api/meta");
+  state.admin = meta.admin;
+  state.statuses = sortStatuses(meta.statuses || []);
+  state.networks = meta.networks || [];
+  qs("filterStatus").innerHTML = optionHtml(state.statuses, true);
+  qs("filterNetwork").innerHTML = optionHtml(state.networks, true);
+  qs("status").innerHTML = optionHtml(state.statuses);
+  qs("network").innerHTML = optionHtml(state.networks);
+  renderMasterLists();
+  return meta;
+}
+
+async function loadPublic(random = true) {
+  const q = encodeURIComponent(qs("searchInput").value.trim());
+  const data = await api(`/api/numbers?q=${q}&random=${random ? 1 : 0}`);
+  state.currentItems = data.items;
+  qs("numberRows").innerHTML = data.items.map((item) => `
+    <tr>
+      <td>${escapeHtml(item.network || "-")}</td>
+      <td><div class="phone">${escapeHtml(item.phone)}</div><div>${escapeHtml(item.status || "")}</div></td>
+      <td>${scoreHtml(item.analysis)}</td>
+      <td class="price">${money(item.sale_price)} บาท</td>
+      <td><button data-detail="${item.id}">รายละเอียด</button></td>
+    </tr>`).join("") || '<tr><td colspan="5">ไม่พบข้อมูล</td></tr>';
+}
+
+async function showDetail(id) {
+  const item = await api(`/api/numbers/${id}`);
+  const a = item.analysis;
+  qs("detailTitle").textContent = `รายละเอียดเบอร์ ${item.phone}`;
+  qs("detailBody").innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-card"><strong>คะแนน</strong><div class="phone">${a.score}/100 (${displayLevel(a)})</div></div>
+      <div class="detail-card"><strong>ราคา</strong><div class="price">${money(item.sale_price)} บาท</div></div>
+      <div class="detail-card"><strong>เครือข่าย</strong><div>${escapeHtml(item.network || "-")}</div></div>
+      <div class="detail-card"><strong>สถานะ</strong><div>${escapeHtml(item.status || "-")}</div></div>
+    </div>
+    <div><h3>สรุปสูตรที่พบ</h3><div class="chips">${a.summary.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div></div>
+    ${a.highlights.length ? `<div class="detail-card"><h3>จุดเด่น</h3><ul>${a.highlights.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>` : ""}
+    ${a.warnings.length ? `<div class="detail-card"><h3>ข้อควรระวัง</h3><ul>${a.warnings.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>` : ""}
+    ${a.career_matches.length ? `<div class="detail-card"><h3>กลุ่มอาชีพที่ส่งเสริม</h3><ul>${a.career_matches.map((m) => `<li>${escapeHtml(m.title)}: ${m.pairs.join(", ")}</li>`).join("")}</ul></div>` : ""}
+    <div><h3>ความหมายเลขคู่ลำดับในเบอร์</h3><div class="pair-list">${a.pair_details.map((p) => `<div class="pair-item"><strong>${p.pair}</strong> ${escapeHtml(p.meaning)}</div>`).join("")}</div></div>`;
+  qs("detailDialog").showModal();
+}
+
+async function checkAdmin() {
+  const meta = await loadMeta();
+  qs("loginPanel").classList.toggle("hidden", meta.admin);
+  qs("adminPanel").classList.toggle("hidden", !meta.admin);
+  qs("replaceAll").checked = false;
+  if (meta.admin) { await loadAdmin(); await loadLogs(); }
+}
+
+function filterQuery() {
+  const p = new URLSearchParams();
+  p.set("page", state.adminPage);
+  for (const [key, id] of [["min_price", "minPrice"], ["max_price", "maxPrice"], ["status", "filterStatus"], ["network", "filterNetwork"]]) {
+    const value = qs(id).value.trim();
+    if (value) p.set(key, value);
+  }
+  return p.toString();
+}
+
+async function loadAdmin() {
+  const data = await api(`/api/admin/list?${filterQuery()}`);
+  state.adminItems = data.items;
+  state.adminTotal = data.total || 0;
+  qs("adminRows").innerHTML = data.items.map((item) => `
+    <tr>
+      <td>${item.sequence_no || ""}</td>
+      <td class="phone">${escapeHtml(item.phone)}</td>
+      <td><button data-detail="${item.id}">รายละเอียด</button></td>
+      <td>${scoreHtml(item.analysis)}</td>
+      <td>${money(item.sale_price)}</td>
+      <td>${money(item.wholesale_price)}</td>
+      <td>${escapeHtml(item.network || "")}</td>
+      <td>${escapeHtml(item.status || "")}</td>
+      <td>${escapeHtml(item.expiry_date || "")}</td>
+      <td class="row-actions"><button data-edit="${item.id}">แก้ไข</button><button class="danger" data-delete="${item.id}">ลบ</button></td>
+    </tr>`).join("") || '<tr><td colspan="10">ไม่พบข้อมูล</td></tr>';
+  const maxPage = Math.max(1, Math.ceil(state.adminTotal / state.adminLimit));
+  qs("adminPageInfo").textContent = `หน้า ${state.adminPage} / ${maxPage} (แสดง 50 รายการ)`;
+  qs("prevAdminPage").disabled = state.adminPage <= 1;
+  qs("nextAdminPage").disabled = state.adminPage >= maxPage;
+}
+
+function fillForm(item = {}) {
+  qs("numberId").value = item.id || "";
+  qs("sequenceNo").value = item.sequence_no || "";
+  qs("phone").value = item.phone || "";
+  qs("salePrice").value = item.sale_price || "";
+  qs("wholesalePrice").value = item.wholesale_price || "";
+  qs("network").value = item.network || (state.networks[0]?.name || "");
+  qs("status").value = item.status || (state.statuses[0]?.name || "รอขาย");
+  qs("expiryDate").value = item.expiry_date || "";
+}
+
+async function saveNumber(event) {
+  event.preventDefault();
+  const payload = { id: qs("numberId").value, sequence_no: qs("sequenceNo").value, phone: qs("phone").value, sale_price: qs("salePrice").value, wholesale_price: qs("wholesalePrice").value, network: qs("network").value, status: qs("status").value, expiry_date: qs("expiryDate").value };
+  await api("/api/admin/save", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  qs("adminMessage").textContent = "บันทึกข้อมูลเรียบร้อย";
+  fillForm();
+  await refreshAdminData();
+}
+
+async function deleteNumber(id) {
+  if (!confirm("ต้องการลบ record เบอร์นี้ใช่ไหม?")) return;
+  await api("/api/admin/delete", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+  await refreshAdminData();
+}
+
+function exportUrl(type) {
+  const p = new URLSearchParams(filterQuery());
+  p.delete("page");
+  window.location.href = `/api/admin/export.${type}${p.toString() ? `?${p.toString()}` : ""}`;
+}
+
+function showResult(title, html) {
+  qs("resultTitle").textContent = title;
+  qs("resultBody").innerHTML = html;
+  qs("resultDialog").showModal();
+}
+
+async function uploadExcel() {
+  const file = qs("excelFile").files[0];
+  if (!file) { showResult("อัปโหลดไม่สำเร็จ", "<p>กรุณาเลือกไฟล์ Excel ก่อน</p>"); return; }
+  if (qs("replaceAll").checked && !confirm("คุณกำลังจะล้างฐานข้อมูลเบอร์เดิมทั้งหมดก่อนนำเข้า ต้องการทำต่อจริงหรือไม่?")) {
+    qs("replaceAll").checked = false;
+    return;
+  }
+  const data = await file.arrayBuffer();
+  try {
+    const result = await api("/api/admin/upload", { method: "POST", headers: { "X-Replace-All": qs("replaceAll").checked ? "1" : "0", "X-Filename": encodeURIComponent(file.name) }, body: data });
+    showResult("อัปโหลดสำเร็จ", `<div class="result-grid"><div><strong>ทั้งหมด</strong><span>${result.total_rows}</span></div><div><strong>นำเข้า</strong><span>${result.imported_rows}</span></div><div><strong>ซ้ำ</strong><span>${result.duplicate_rows}</span></div><div><strong>Error</strong><span>${result.error_rows}</span></div></div><p>บันทึก log เลขที่ ${result.log_id}</p>${result.details.length ? `<h3>รายการที่ต้องตรวจสอบ</h3><div class="log-detail">${result.details.slice(0, 20).map((d) => `<p>แถว ${d.row} ${escapeHtml(d.phone || "")}: ${escapeHtml(d.message)}</p>`).join("")}</div>` : ""}`);
+    qs("replaceAll").checked = false;
+    await refreshAdminData();
+  } catch (error) {
+    showResult("อัปโหลดไม่สำเร็จ", `<p>${escapeHtml(error.message)}</p>`);
+    await loadLogs();
+  }
+}
+
+async function refreshAdminData() {
+  await loadMeta();
+  await loadAdmin();
+  await loadLogs();
+  await loadPublic();
+}
+
+function renderMasterLists() {
+  qs("statusList").innerHTML = state.statuses.map((i) => masterRow("status", i)).join("");
+  qs("networkList").innerHTML = state.networks.map((i) => masterRow("network", i)).join("");
+}
+
+function masterRow(kind, item) {
+  return `<div class="master-row"><span>${escapeHtml(item.name)}</span><small>ลำดับ ${item.sort_order || 0}</small><button data-master-edit="${kind}" data-id="${item.id}">แก้ไข</button><button class="danger" data-master-delete="${kind}" data-id="${item.id}">ลบ</button></div>`;
+}
+
+function fillMaster(kind, item = {}) {
+  const prefix = kind === "status" ? "status" : "network";
+  qs(`${prefix}Id`).value = item.id || "";
+  qs(`${prefix}Name`).value = item.name || "";
+  qs(`${prefix}Order`).value = item.sort_order || "";
+}
+
+async function saveMaster(kind, event) {
+  event.preventDefault();
+  const prefix = kind === "status" ? "status" : "network";
+  const path = kind === "status" ? "statuses" : "networks";
+  await api(`/api/admin/${path}/save`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: qs(`${prefix}Id`).value, name: qs(`${prefix}Name`).value, sort_order: qs(`${prefix}Order`).value }) });
+  fillMaster(kind);
+  await refreshAdminData();
+}
+
+async function deleteMaster(kind, id) {
+  if (!confirm("ต้องการลบข้อมูลพื้นฐานนี้ใช่ไหม?")) return;
+  const path = kind === "status" ? "statuses" : "networks";
+  try {
+    await api(`/api/admin/${path}/delete`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    await refreshAdminData();
+  } catch (error) { showResult("ลบไม่ได้", `<p>${escapeHtml(error.message)}</p>`); }
+}
+
+async function loadLogs() {
+  const data = await api("/api/admin/import-logs");
+  qs("logRows").innerHTML = data.items.map((log) => `<tr><td>${escapeHtml(log.created_at)}</td><td>${escapeHtml(decodeURIComponent(log.filename || ""))}</td><td>${log.total_rows}</td><td>${log.imported_rows}</td><td>${log.duplicate_rows}</td><td>${log.error_rows}</td><td><button data-log="${log.id}">ดูรายละเอียด</button></td></tr>`).join("") || '<tr><td colspan="7">ยังไม่มีประวัติ import</td></tr>';
+}
+
+async function showLog(id) {
+  const log = await api(`/api/admin/import-logs/${id}`);
+  showResult(`Import log #${id}`, `<div class="result-grid"><div><strong>ทั้งหมด</strong><span>${log.total_rows}</span></div><div><strong>นำเข้า</strong><span>${log.imported_rows}</span></div><div><strong>ซ้ำ</strong><span>${log.duplicate_rows}</span></div><div><strong>Error</strong><span>${log.error_rows}</span></div></div><div class="log-detail">${(log.details || []).map((d) => `<p>แถว ${d.row} ${escapeHtml(d.phone || "")}: ${escapeHtml(d.status)} - ${escapeHtml(d.message)}</p>`).join("") || "<p>ไม่มี error หรือรายการซ้ำ</p>"}</div>`);
+}
+
+qs("publicTab").addEventListener("click", () => showView("public"));
+qs("adminTab").addEventListener("click", () => showView("admin"));
+qs("searchBtn").addEventListener("click", () => loadPublic(false));
+qs("randomBtn").addEventListener("click", () => { qs("searchInput").value = ""; loadPublic(true); });
+qs("searchInput").addEventListener("keydown", (event) => { if (event.key === "Enter") loadPublic(false); });
+qs("numberRows").addEventListener("click", (event) => { const id = event.target.dataset.detail; if (id) showDetail(id); });
+qs("closeDetail").addEventListener("click", () => qs("detailDialog").close());
+qs("closeResult").addEventListener("click", () => qs("resultDialog").close());
+qs("loginBtn").addEventListener("click", async () => {
+  qs("loginMessage").textContent = "";
+  try {
+    await api("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user: qs("loginUser").value, password: qs("loginPassword").value }) });
+    qs("loginUser").value = "";
+    qs("loginPassword").value = "";
+    await checkAdmin();
+  } catch (error) { qs("loginMessage").textContent = error.message; qs("loginMessage").classList.add("error"); }
+});
+qs("logoutBtn").addEventListener("click", async () => { await fetch("/api/logout", { method: "POST" }); await checkAdmin(); });
+qs("numberForm").addEventListener("submit", saveNumber);
+qs("clearForm").addEventListener("click", () => fillForm());
+qs("uploadBtn").addEventListener("click", uploadExcel);
+qs("templateBtn").addEventListener("click", () => { window.location.href = "/api/admin/template.xlsx"; });
+qs("refreshAdmin").addEventListener("click", loadAdmin);
+qs("refreshLogs").addEventListener("click", loadLogs);
+qs("exportXlsx").addEventListener("click", () => exportUrl("xlsx"));
+qs("exportPdf").addEventListener("click", () => exportUrl("pdf"));
+qs("prevAdminPage").addEventListener("click", async () => { if (state.adminPage > 1) { state.adminPage -= 1; await loadAdmin(); } });
+qs("nextAdminPage").addEventListener("click", async () => { state.adminPage += 1; await loadAdmin(); });
+qs("adminRows").addEventListener("click", (event) => {
+  const edit = event.target.dataset.edit;
+  const del = event.target.dataset.delete;
+  const detail = event.target.dataset.detail;
+  if (edit) { fillForm(state.adminItems.find((r) => String(r.id) === String(edit))); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  if (del) deleteNumber(del);
+  if (detail) showDetail(detail);
+});
+qs("statusForm").addEventListener("submit", (event) => saveMaster("status", event));
+qs("networkForm").addEventListener("submit", (event) => saveMaster("network", event));
+qs("clearStatus").addEventListener("click", () => fillMaster("status"));
+qs("clearNetwork").addEventListener("click", () => fillMaster("network"));
+qs("statusList").addEventListener("click", (event) => { const id = event.target.dataset.id; if (event.target.dataset.masterEdit) fillMaster("status", state.statuses.find((i) => String(i.id) === String(id))); if (event.target.dataset.masterDelete) deleteMaster("status", id); });
+qs("networkList").addEventListener("click", (event) => { const id = event.target.dataset.id; if (event.target.dataset.masterEdit) fillMaster("network", state.networks.find((i) => String(i.id) === String(id))); if (event.target.dataset.masterDelete) deleteMaster("network", id); });
+qs("logRows").addEventListener("click", (event) => { const id = event.target.dataset.log; if (id) showLog(id); });
+["minPrice", "maxPrice", "filterStatus", "filterNetwork"].forEach((id) => qs(id).addEventListener("change", async () => { state.adminPage = 1; await loadAdmin(); }));
+qs("footerStatus").addEventListener("click", () => { showView("admin"); setTimeout(() => qs("statusMasterPanel")?.scrollIntoView({ behavior: "smooth" }), 200); });
+qs("footerNetwork").addEventListener("click", () => { showView("admin"); setTimeout(() => qs("networkMasterPanel")?.scrollIntoView({ behavior: "smooth" }), 200); });
+
+loadMeta().then(() => loadPublic());
