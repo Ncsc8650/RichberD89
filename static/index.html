@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Rich Ber D 89</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <img src="/static/logo01.jpg" alt="Rich Ber D 89">
+      <div>
+        <h1>Rich Ber D 89</h1>
+        <p>เบอร์สวย เบอร์ดี เบอร์มงคล พร้อมสูตรทำนายคะแนน</p>
+      </div>
+    </div>
+    <nav>
+      <button id="publicTab" class="nav-btn active">หน้าแรก</button>
+      <button id="adminTab" class="nav-btn">Login หลังบ้าน</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="publicView" class="view active">
+      <div class="toolbar">
+        <label class="search-box"><span>ค้นหา</span><input id="searchInput" placeholder="ค้นหาได้ทุกตำแหน่ง เช่น 789, AIS, 65"></label>
+        <button id="searchBtn" class="primary">ค้นหา</button>
+        <button id="randomBtn">สุ่ม 20 เบอร์</button>
+      </div>
+      <div class="table-wrap"><table><thead><tr><th>เครือข่าย</th><th>หมายเลขโทรศัพท์</th><th>คะแนน</th><th>ราคาขาย</th><th></th></tr></thead><tbody id="numberRows"></tbody></table></div>
+    </section>
+
+    <section id="adminView" class="view">
+      <div id="loginPanel" class="panel narrow">
+        <h2>เข้าสู่ระบบหลังบ้าน</h2>
+        <label>Userid <input id="loginUser" autocomplete="username"></label>
+        <label>Password <input id="loginPassword" type="password" autocomplete="current-password"></label>
+        <button id="loginBtn" class="primary">Login</button>
+        <p id="loginMessage" class="message"></p>
+      </div>
+
+      <div id="adminPanel" class="admin-grid hidden">
+        <section class="panel">
+          <div class="panel-head"><h2>เพิ่ม / แก้ไขเบอร์</h2><button id="logoutBtn">ออกจากระบบ</button></div>
+          <form id="numberForm" class="form-grid">
+            <input type="hidden" id="numberId">
+            <label>ลำดับ <input id="sequenceNo" type="number"></label>
+            <label>หมายเลขโทรศัพท์ <input id="phone" required></label>
+            <label>ราคาขาย <input id="salePrice" type="number" step="0.01"></label>
+            <label>ราคาส่ง <input id="wholesalePrice" type="number" step="0.01"></label>
+            <label>เครือข่าย <select id="network"></select></label>
+            <label>สถานะ <select id="status"></select></label>
+            <label>วันหมดอายุ <input id="expiryDate" type="date"></label>
+            <div class="actions"><button class="primary" type="submit">บันทึก</button><button type="button" id="clearForm">ล้างฟอร์ม</button></div>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Import / Export</h2>
+          <label>อัปโหลด Excel (.xlsx)<input id="excelFile" type="file" accept=".xlsx"></label>
+          <label class="check-row"><input id="replaceAll" type="checkbox" checked><span>ล้างฐานข้อมูลเบอร์เดิมก่อนนำเข้า</span></label>
+          <button id="uploadBtn" class="primary">นำเข้าข้อมูล</button>
+          <div class="filters">
+            <label>ราคาต่ำสุด <input id="minPrice" type="number"></label>
+            <label>ราคาสูงสุด <input id="maxPrice" type="number"></label>
+            <label>สถานะ <select id="filterStatus"><option value="">ทั้งหมด</option></select></label>
+            <label>เครือข่าย <select id="filterNetwork"><option value="">ทั้งหมด</option></select></label>
+          </div>
+          <div class="actions"><button id="exportXlsx">Export Excel</button><button id="exportPdf">Export PDF</button></div>
+          <p id="adminMessage" class="message"></p>
+        </section>
+
+        <section class="panel">
+          <h2>ข้อมูลพื้นฐาน: สถานะ</h2>
+          <form id="statusForm" class="master-form"><input type="hidden" id="statusId"><label>ชื่อสถานะ <input id="statusName"></label><label>ลำดับ <input id="statusOrder" type="number"></label><div class="actions"><button class="primary" type="submit">บันทึกสถานะ</button><button type="button" id="clearStatus">ล้าง</button></div></form>
+          <div id="statusList" class="master-list"></div>
+        </section>
+
+        <section class="panel">
+          <h2>ข้อมูลพื้นฐาน: เครือข่าย</h2>
+          <form id="networkForm" class="master-form"><input type="hidden" id="networkId"><label>ชื่อเครือข่าย <input id="networkName"></label><label>ลำดับ <input id="networkOrder" type="number"></label><div class="actions"><button class="primary" type="submit">บันทึกเครือข่าย</button><button type="button" id="clearNetwork">ล้าง</button></div></form>
+          <div id="networkList" class="master-list"></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel-head"><h2>รายการทั้งหมด</h2><button id="refreshAdmin">รีเฟรช</button></div>
+          <div class="table-wrap"><table><thead><tr><th>ลำดับ</th><th>เบอร์</th><th>คะแนน</th><th>ราคาขาย</th><th>ราคาส่ง</th><th>เครือข่าย</th><th>สถานะ</th><th>จัดการ</th></tr></thead><tbody id="adminRows"></tbody></table></div>
+        </section>
+
+        <section class="panel wide">
+          <div class="panel-head"><h2>ประวัติ Import / Error Log</h2><button id="refreshLogs">รีเฟรช log</button></div>
+          <div class="table-wrap"><table><thead><tr><th>เวลา</th><th>ไฟล์</th><th>ทั้งหมด</th><th>นำเข้า</th><th>ซ้ำ</th><th>Error</th><th>รายละเอียด</th></tr></thead><tbody id="logRows"></tbody></table></div>
+        </section>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="detailDialog"><div class="dialog-head"><h2 id="detailTitle">รายละเอียดเบอร์</h2><button id="closeDetail" aria-label="ปิด">x</button></div><div id="detailBody"></div></dialog>
+  <dialog id="resultDialog"><div class="dialog-head"><h2 id="resultTitle">ผลการทำงาน</h2><button id="closeResult" aria-label="ปิด">x</button></div><div id="resultBody"></div></dialog>
+  <footer>ติดต่อสอบถาม: 0873474444</footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>
