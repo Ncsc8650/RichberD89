@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#071a2f"/>
+  <path d="M104 112h304l56 56v176l-56 56H104l-56-56V168z" fill="none" stroke="#d8ad4f" stroke-width="18"/>
+  <text x="256" y="220" text-anchor="middle" font-family="Georgia,serif" font-size="78" fill="#f3d57c" font-weight="700">Rich</text>
+  <text x="256" y="292" text-anchor="middle" font-family="Georgia,serif" font-size="54" fill="#f3d57c">Ber D</text>
+  <text x="256" y="382" text-anchor="middle" font-family="Georgia,serif" font-size="112" fill="#f3d57c" font-weight="700">89</text>
+</svg>
