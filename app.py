@@ -21,12 +21,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
+
 BASE_DIR = Path(__file__).resolve().parent
 STATIC_DIR = BASE_DIR / "static"
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = DATA_DIR / "richber.sqlite3"
-ADMIN_USER = "rich89"
-ADMIN_PASSWORD = "89rich"
+ADMIN_USER = os.environ.get("RICHBER_ADMIN_USER", "")
+ADMIN_PASSWORD_HASH = os.environ.get("RICHBER_ADMIN_PASSWORD_SHA256", "")
 SESSIONS = set()
 
 MONEY_CHARM = {"22", "24", "42", "26", "62", "36", "63", "46", "64", "56", "65", "66", "69", "96"}
@@ -38,21 +39,43 @@ GOOD_ENDINGS = {"5", "9"}
 NEGATIVE_ENDINGS = {"0", "1", "3", "7", "8"}
 STATUS_ORDER = {"จองแล้ว": 1, "รอขาย": 2, "จำหน่ายแล้ว": 3, "จำหน่ายไปแล้ว": 3}
 PAIR_MEANINGS = {
-    "14": "พูดดี มีความรู้ วิชาการและการสื่อสารเด่น", "41": "พูดดี มีปัญญา วิชาการเด่น",
-    "15": "ปัญญาละเอียด น่าเชื่อถือ ผู้ใหญ่เมตตา", "51": "ปัญญาผู้ใหญ่ น่าเชื่อถือ ผู้ใหญ่เมตตา",
-    "16": "บริหารเงินดี คิดละเอียด วางแผนเก่ง", "61": "วางแผนเก่ง เก็บเงินดี คิดละเอียด",
-    "22": "พูดเก่ง มีเสน่ห์ อ่อนโยน", "24": "เมตตามหานิยม คนสนับสนุน การเงินดี", "42": "เมตตาค้าขาย คนช่วยเหลือ เงินเข้าตลอด",
-    "26": "พูดดี ได้ทรัพย์จากการพูด โรแมนติก", "62": "เสน่ห์ อ่อนโยน ได้ทรัพย์จากคำพูด",
-    "36": "คู่มิตร เสน่ห์ดี หาเงินคล่อง", "63": "คู่มิตร เสน่ห์ ทรัพย์ หาเงินคล่อง",
-    "45": "สติปัญญา เหตุผล ความน่าเชื่อถือ", "54": "ปัญญา เหตุผล การเรียน งานที่ปรึกษา", "55": "ธรรมะ เหตุผล รอบคอบ",
-    "56": "ทรัพย์และปัญญา คุมการเงินและการตัดสินใจ", "65": "ทรัพย์เสน่ห์และสติปัญญา เป็นคู่เด่นมาก",
-    "59": "สิ่งศักดิ์สิทธิ์ ปัญญา โชค", "95": "ปัญญา สิ่งศักดิ์สิทธิ์ โชคและความคุ้มครอง",
-    "66": "เสน่ห์ ความสบาย ทรัพย์และความนิยม", "69": "เสน่ห์ เงิน ความงาม ศิลปะ", "96": "เสน่ห์ ความงาม ทรัพย์ ศิลปะ",
-    "78": "คู่มิตรงานใหญ่ ความเสี่ยง หุ้น โครงการใหญ่", "87": "คู่มิตรงานใหญ่ ความเสี่ยงและการสนับสนุน",
-    "00": "โลกส่วนตัวสูง เก็บความเครียด ควรระวังสุขภาพ", "03": "ใจร้อน รวดเร็ว ชอบลุย", "30": "ใจร้อน รวดเร็ว ชอบลุย",
-    "06": "มีเสน่ห์แต่ใจอ่อน ใช้เงินง่าย ระวังเงินรั่ว", "60": "มีเสน่ห์แต่ใจอ่อน ใช้เงินง่าย ระวังเงินรั่ว",
-    "27": "คู่หนี้สิน ระวังภาระการเงิน", "37": "อุปสรรคและแรงกดดันสูง", "38": "กล้าได้กล้าเสีย ตัดสินใจไว",
-    "47": "ลุยงานหนัก พูดตรงแรง", "74": "ลุยงานหนัก พูดตรงแรง", "50": "คิดมาก ฟุ้งซ่าน ระวังความเครียด", "05": "คิดลึก ระวังคิดมากเกินไป",
+    "14": "พูดดี มีความรู้ วิชาการและการสื่อสารเด่น",
+    "41": "พูดดี มีปัญญา วิชาการเด่น",
+    "15": "ปัญญาละเอียด น่าเชื่อถือ ผู้ใหญ่เมตตา",
+    "51": "ปัญญาผู้ใหญ่ น่าเชื่อถือ ผู้ใหญ่เมตตา",
+    "16": "บริหารเงินดี คิดละเอียด วางแผนเก่ง",
+    "61": "วางแผนเก่ง เก็บเงินดี คิดละเอียด",
+    "22": "พูดเก่ง มีเสน่ห์ อ่อนโยน",
+    "24": "เมตตามหานิยม คนสนับสนุน การเงินดี",
+    "42": "เมตตาค้าขาย คนช่วยเหลือ เงินเข้าตลอด",
+    "26": "พูดดี ได้ทรัพย์จากการพูด โรแมนติก",
+    "62": "เสน่ห์ อ่อนโยน ได้ทรัพย์จากคำพูด",
+    "36": "คู่มิตร เสน่ห์ดี หาเงินคล่อง",
+    "63": "คู่มิตร เสน่ห์ ทรัพย์ หาเงินคล่อง",
+    "45": "สติปัญญา เหตุผล ความน่าเชื่อถือ",
+    "54": "ปัญญา เหตุผล การเรียน งานที่ปรึกษา",
+    "55": "ธรรมะ เหตุผล รอบคอบ",
+    "56": "ทรัพย์และปัญญา คุมการเงินและการตัดสินใจ",
+    "65": "ทรัพย์เสน่ห์และสติปัญญา เป็นคู่เด่นมาก",
+    "59": "สิ่งศักดิ์สิทธิ์ ปัญญา โชค",
+    "95": "ปัญญา สิ่งศักดิ์สิทธิ์ โชคและความคุ้มครอง",
+    "66": "เสน่ห์ ความสบาย ทรัพย์และความนิยม",
+    "69": "เสน่ห์ เงิน ความงาม ศิลปะ",
+    "96": "เสน่ห์ ความงาม ทรัพย์ ศิลปะ",
+    "78": "คู่มิตรงานใหญ่ ความเสี่ยง หุ้น โครงการใหญ่",
+    "87": "คู่มิตรงานใหญ่ ความเสี่ยงและการสนับสนุน",
+    "00": "โลกส่วนตัวสูง เก็บความเครียด ควรระวังสุขภาพ",
+    "03": "ใจร้อน รวดเร็ว ชอบลุย",
+    "30": "ใจร้อน รวดเร็ว ชอบลุย",
+    "06": "มีเสน่ห์แต่ใจอ่อน ใช้เงินง่าย ระวังเงินรั่ว",
+    "60": "มีเสน่ห์แต่ใจอ่อน ใช้เงินง่าย ระวังเงินรั่ว",
+    "27": "คู่หนี้สิน ระวังภาระการเงิน",
+    "37": "อุปสรรคและแรงกดดันสูง",
+    "38": "กล้าได้กล้าเสีย ตัดสินใจไว",
+    "47": "ลุยงานหนัก พูดตรงแรง",
+    "74": "ลุยงานหนัก พูดตรงแรง",
+    "50": "คิดมาก ฟุ้งซ่าน ระวังความเครียด",
+    "05": "คิดลึก ระวังคิดมากเกินไป",
 }
 CAREER_GROUPS = {
     "ราชการ/ผู้ใหญ่สนับสนุน": {"14", "41", "15", "51", "45", "54", "19", "91", "35", "53"},
@@ -66,7 +89,6 @@ CAREER_GROUPS = {
 
 
 def db():
-    DATA_DIR.mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
@@ -77,56 +99,81 @@ def normalize_phone(value):
 
 
 def phone_pairs(phone):
-    d = normalize_phone(phone)
-    return [d[i:i + 2] for i in range(max(0, len(d) - 1))]
+    digits = normalize_phone(phone)
+    return [digits[i:i + 2] for i in range(max(0, len(digits) - 1))]
 
 
 def analyze_phone(phone):
-    d = normalize_phone(phone)
-    pairs = phone_pairs(d)
+    digits = normalize_phone(phone)
+    pairs = phone_pairs(digits)
     score = 50
-    summary, highlights, warnings = [], [], []
-    groups = {"ทรัพย์/เสน่ห์": sorted(set(pairs) & MONEY_CHARM), "สติปัญญา": sorted(set(pairs) & WISDOM), "คู่มิตร": sorted(set(pairs) & FRIENDS), "ความรักสดใส": sorted(set(pairs) & LOVE)}
-    score += 7 * len(groups["ทรัพย์/เสน่ห์"]) + 7 * len(groups["สติปัญญา"]) + 5 * len(groups["คู่มิตร"]) + 3 * len(groups["ความรักสดใส"])
+    summary = []
+    highlights = []
+    warnings = []
+    groups = {
+        "ทรัพย์/เสน่ห์": sorted(set(pairs) & MONEY_CHARM),
+        "สติปัญญา": sorted(set(pairs) & WISDOM),
+        "คู่มิตร": sorted(set(pairs) & FRIENDS),
+        "ความรักสดใส": sorted(set(pairs) & LOVE),
+    }
+    score += 7 * len(groups["ทรัพย์/เสน่ห์"])
+    score += 7 * len(groups["สติปัญญา"])
+    score += 5 * len(groups["คู่มิตร"])
+    score += 3 * len(groups["ความรักสดใส"])
     bad = sorted(set(pairs) & BAD_PAIRS)
     score -= 6 * len(bad)
     if bad:
         warnings.append("มีเลขคู่ที่ควรใช้ด้วยความระวัง: " + ", ".join(bad))
-    if d.endswith("65"):
+    if digits.endswith("65"):
         score += 15
         highlights.append("ลงท้าย 65 เด่นมาก: ทรัพย์ เสน่ห์ และปัญญา")
-    elif d[-1:] in GOOD_ENDINGS:
+    elif digits[-1:] in GOOD_ENDINGS:
         score += 8
-        highlights.append(f"ลงท้ายด้วย {d[-1]} ช่วยเสริมสติหรือความคุ้มครอง")
-    elif d[-1:] in NEGATIVE_ENDINGS:
+        highlights.append(f"ลงท้ายด้วย {digits[-1]} ช่วยเสริมสติหรือความคุ้มครอง")
+    elif digits[-1:] in NEGATIVE_ENDINGS:
         score -= 8
-        warnings.append(f"ลงท้ายด้วย {d[-1]} ควรระวังอารมณ์ ความเครียด หรือเงินรั่ว")
-    if "0" in d[3:]:
+        warnings.append(f"ลงท้ายด้วย {digits[-1]} ควรระวังอารมณ์ ความเครียด หรือเงินรั่ว")
+    if "0" in digits[3:]:
         score -= 4
         warnings.append("มีเลข 0 หลังตำแหน่งต้นเบอร์ ควรระวังปัญหาซ่อนเร้น")
-    if d.count("8") > 1:
+    if digits.count("8") > 1:
         score -= 4
         warnings.append("มีเลข 8 มากกว่า 1 ตัว เหมาะงานเสี่ยงแต่ควรคุมอารมณ์และการเงิน")
-    if d.count("5") or d.count("9"):
+    if digits.count("5") or digits.count("9"):
         score += 4
         highlights.append("มีเลข 5 หรือ 9 ช่วยคุมพลังแรงของเบอร์")
     careers = []
-    for title, vals in CAREER_GROUPS.items():
-        found = sorted(set(pairs) & vals)
+    for title, values in CAREER_GROUPS.items():
+        found = sorted(set(pairs) & values)
         if found:
             careers.append({"title": title, "pairs": found})
             score += min(5, len(found) * 2)
-    for title, vals in groups.items():
-        if vals:
-            summary.append(f"{title}: {', '.join(vals)}")
+    for title, values in groups.items():
+        if values:
+            summary.append(f"{title}: {', '.join(values)}")
     if not summary:
         summary.append("ยังไม่พบกลุ่มเลขเด่นตามสูตรหลัก")
     score = max(0, min(100, score))
-    level = "ดีมาก" if score >= 85 else "ดี" if score >= 70 else "กลาง"
-    return {"score": score, "level": level, "pairs": pairs, "summary": summary, "highlights": highlights, "warnings": warnings, "career_matches": careers[:5], "pair_details": [{"pair": p, "meaning": PAIR_MEANINGS.get(p, "เลขคู่นี้ใช้ประกอบคะแนนจากกลุ่มเลข")} for p in pairs]}
+    if score >= 85:
+        level = "ดีมาก"
+    elif score >= 70:
+        level = "ดี"
+    else:
+        level = "กลาง"
+    return {
+        "score": score,
+        "level": level,
+        "pairs": pairs,
+        "summary": summary,
+        "highlights": highlights,
+        "warnings": warnings,
+        "career_matches": careers[:5],
+        "pair_details": [{"pair": p, "meaning": PAIR_MEANINGS.get(p, "เลขคู่นี้ใช้ประกอบคะแนนจากกลุ่มเลข")} for p in pairs],
+    }
 
 
 def init_db():
+    DATA_DIR.mkdir(exist_ok=True)
     with db() as conn:
         conn.execute("CREATE TABLE IF NOT EXISTS numbers (id INTEGER PRIMARY KEY AUTOINCREMENT, sequence_no INTEGER, phone TEXT UNIQUE NOT NULL, sale_price REAL DEFAULT 0, wholesale_price REAL DEFAULT 0, network TEXT DEFAULT '', status TEXT DEFAULT 'รอขาย', expiry_date TEXT DEFAULT '', created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         conn.execute("CREATE TABLE IF NOT EXISTS statuses (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE NOT NULL, sort_order INTEGER DEFAULT 0, created_at TEXT DEFAULT CURRENT_TIMESTAMP, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
@@ -200,7 +247,15 @@ def import_excel(path, filename="", replace_all=False):
         return {"total_rows": 0, "imported_rows": 0, "duplicate_rows": 0, "error_rows": 0, "details": []}
     headers = [str(h or "").strip() for h in rows[0]]
     idx = {name: i for i, name in enumerate(headers)}
-    aliases = {"sequence_no": ["ลำดับ", "no", "seq"], "phone": ["หมายเลขโทรศัพท์", "เบอร์โทรศัพท์", "phone"], "sale_price": ["ราคาขาย", "sale_price"], "wholesale_price": ["ราคาส่ง", "wholesale_price"], "network": ["เครือข่าย", "network"], "status": ["สถานะ", "status"], "expiry_date": ["วันหมดอายุ", "expiry_date"]}
+    aliases = {
+        "sequence_no": ["ลำดับ", "no", "seq"],
+        "phone": ["หมายเลขโทรศัพท์", "เบอร์โทรศัพท์", "phone"],
+        "sale_price": ["ราคาขาย", "sale_price"],
+        "wholesale_price": ["ราคาส่ง", "wholesale_price"],
+        "network": ["เครือข่าย", "network"],
+        "status": ["สถานะ", "status"],
+        "expiry_date": ["วันหมดอายุ", "expiry_date"],
+    }
 
     def pick(row, key, default=""):
         for name in aliases[key]:
@@ -209,7 +264,8 @@ def import_excel(path, filename="", replace_all=False):
         return default
 
     imported = duplicates = errors = 0
-    details, seen = [], set()
+    details = []
+    seen = set()
     with db() as conn:
         if replace_all:
             conn.execute("DELETE FROM numbers")
@@ -227,7 +283,15 @@ def import_excel(path, filename="", replace_all=False):
                     duplicates += 1
                     details.append({"row": row_no, "phone": phone, "status": "duplicate", "message": "เบอร์ซ้ำกับข้อมูลเดิมในฐานข้อมูล"})
                     continue
-                values = {"sequence_no": int(pick(row, "sequence_no") or 0), "phone": phone, "sale_price": float(pick(row, "sale_price") or 0), "wholesale_price": float(pick(row, "wholesale_price") or 0), "network": str(pick(row, "network") or "").strip(), "status": str(pick(row, "status") or "รอขาย").strip(), "expiry_date": parse_date(pick(row, "expiry_date"))}
+                values = {
+                    "sequence_no": int(pick(row, "sequence_no") or 0),
+                    "phone": phone,
+                    "sale_price": float(pick(row, "sale_price") or 0),
+                    "wholesale_price": float(pick(row, "wholesale_price") or 0),
+                    "network": str(pick(row, "network") or "").strip(),
+                    "status": str(pick(row, "status") or "รอขาย").strip(),
+                    "expiry_date": parse_date(pick(row, "expiry_date")),
+                }
                 ensure_master(conn, "networks", values["network"])
                 ensure_master(conn, "statuses", values["status"])
                 conn.execute("INSERT INTO numbers(sequence_no, phone, sale_price, wholesale_price, network, status, expiry_date) VALUES(:sequence_no, :phone, :sale_price, :wholesale_price, :network, :status, :expiry_date)", values)
@@ -241,7 +305,8 @@ def import_excel(path, filename="", replace_all=False):
 
 
 def query_numbers(params, public_only=False, randomize=False, limit=20, offset=0, admin_order=False):
-    where, args = [], []
+    where = []
+    args = []
     if public_only:
         where.append("COALESCE(status, '') NOT IN (?, ?)")
         args.extend(["จำหน่ายแล้ว", "จำหน่ายไปแล้ว"])
@@ -294,7 +359,11 @@ def file_response(handler, data, filename, content_type):
 
 
 def pdf_font_name():
-    candidates = [BASE_DIR / "Fonts" / "tahoma.ttf", BASE_DIR / "fonts" / "NotoSansThai-Regular.ttf", Path(os.environ.get("WINDIR", "C:\\Windows")) / "Fonts" / "tahoma.ttf"]
+    candidates = [
+        BASE_DIR / "Fonts" / "tahoma.ttf",
+        BASE_DIR / "fonts" / "NotoSansThai-Regular.ttf",
+        Path(os.environ.get("WINDIR", "C:\\Windows")) / "Fonts" / "tahoma.ttf",
+    ]
     for path in candidates:
         if path.exists():
             pdfmetrics.registerFont(TTFont("ThaiPDF", str(path)))
@@ -329,7 +398,8 @@ class App(BaseHTTPRequestHandler):
 
     def do_GET(self):
         parsed = urlparse(self.path)
-        path, params = parsed.path, parse_qs(parsed.query)
+        path = parsed.path
+        params = parse_qs(parsed.query)
         if path == "/":
             return self.send_index()
         if path.startswith("/static/"):
@@ -345,7 +415,8 @@ class App(BaseHTTPRequestHandler):
             return
         if path == "/api/numbers":
             page = max(1, int((params.get("page") or ["1"])[0] or 1))
-            return json_response(self, query_numbers(params, True, (params.get("random") or ["1"])[0] != "0", 20, (page - 1) * 20))
+            randomize = (params.get("random") or ["1"])[0] != "0"
+            return json_response(self, query_numbers(params, True, randomize, 20, (page - 1) * 20))
         if path.startswith("/api/numbers/"):
             with db() as conn:
                 row = conn.execute("SELECT * FROM numbers WHERE id = ?", [path.rsplit("/", 1)[-1]]).fetchone()
@@ -387,7 +458,8 @@ class App(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         if parsed.path == "/api/login":
             data = self.read_json()
-            ok = data.get("user") == ADMIN_USER and secrets.compare_digest(hashlib.sha256((data.get("password") or "").encode()).hexdigest(), hashlib.sha256(ADMIN_PASSWORD.encode()).hexdigest())
+            password_hash = hashlib.sha256((data.get("password") or "").encode()).hexdigest()
+            ok = bool(ADMIN_USER and ADMIN_PASSWORD_HASH) and data.get("user") == ADMIN_USER and secrets.compare_digest(password_hash, ADMIN_PASSWORD_HASH)
             if not ok:
                 return json_response(self, {"error": "userid หรือ password ไม่ถูกต้อง"}, 403)
             sid = secrets.token_urlsafe(32)
@@ -412,7 +484,16 @@ class App(BaseHTTPRequestHandler):
             phone = normalize_phone(data.get("phone"))
             if not phone:
                 return json_response(self, {"error": "กรุณาระบุหมายเลขโทรศัพท์"}, 400)
-            payload = {"id": data.get("id") or None, "sequence_no": int(data.get("sequence_no") or 0), "phone": phone, "sale_price": float(data.get("sale_price") or 0), "wholesale_price": float(data.get("wholesale_price") or 0), "network": (data.get("network") or "").strip(), "status": (data.get("status") or "รอขาย").strip(), "expiry_date": (data.get("expiry_date") or "").strip()}
+            payload = {
+                "id": data.get("id") or None,
+                "sequence_no": int(data.get("sequence_no") or 0),
+                "phone": phone,
+                "sale_price": float(data.get("sale_price") or 0),
+                "wholesale_price": float(data.get("wholesale_price") or 0),
+                "network": (data.get("network") or "").strip(),
+                "status": (data.get("status") or "รอขาย").strip(),
+                "expiry_date": (data.get("expiry_date") or "").strip(),
+            }
             with db() as conn:
                 ensure_master(conn, "networks", payload["network"])
                 ensure_master(conn, "statuses", payload["status"])
@@ -491,7 +572,13 @@ class App(BaseHTTPRequestHandler):
         for row in self.export_rows(params)[:500]:
             data.append([row["sequence_no"], row["phone"], row["analysis"]["score"], f'{row["sale_price"]:,.0f}', row["network"], row["status"], row["expiry_date"]])
         table = Table(data, repeatRows=1)
-        table.setStyle(TableStyle([("FONT", (0, 0), (-1, -1), font, 10), ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0b2341")), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#b8c2cc")), ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")])]))
+        table.setStyle(TableStyle([
+            ("FONT", (0, 0), (-1, -1), font, 10),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0b2341")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#b8c2cc")),
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f4f7fb")]),
+        ]))
         elements.append(table)
         doc.build(elements)
         return file_response(self, bio.getvalue(), "richber-export.pdf", "application/pdf")
