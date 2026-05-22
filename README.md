@@ -5,27 +5,14 @@
 ## Run
 
 ```powershell
-python app.py
+& 'C:\Users\ditsa\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe' app.py
 ```
-
-หรือใช้ไฟล์ `run.ps1` บนเครื่อง Codex นี้
 
 เปิดเว็บที่ `http://127.0.0.1:8000`
 
 ## Login หลังบ้าน
 
-- Userid: `rich89`
-- Password: `89rich`
-
-## ความสามารถล่าสุด
-
-- ล้างฐานข้อมูลก่อน import จาก Excel ได้
-- ตรวจเบอร์ซ้ำกับข้อมูลเดิมและเบอร์ซ้ำในไฟล์
-- บันทึก import log/error log ดูย้อนหลังได้
-- เพิ่ม/แก้ไข/ลบเบอร์ในหลังบ้าน
-- เพิ่ม/แก้ไข/ลบข้อมูลพื้นฐานสถานะและเครือข่าย
-- dropdown สถานะ/เครือข่ายเชื่อมกับ master table
-- export Excel/PDF ตาม filter ราคา สถานะ เครือข่าย
+ข้อมูลผู้ใช้หลังบ้านเก็บในฐานข้อมูล/Google Sheet และไม่บันทึกรหัสผ่านแบบ plain text ในโค้ดสาธารณะ
 
 ## Excel fields
 
